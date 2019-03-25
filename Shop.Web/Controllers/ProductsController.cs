@@ -1,141 +1,144 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
-using Shop.Web.Data;
-using Shop.Web.Data.Entities;
+﻿
 
 namespace Shop.Web.Controllers
 {
-    public class ProductsController : Controller
-    {
-		private readonly IRepository repository;
+	using System.Threading.Tasks;
+	using Data;
+	using Data.Entities;
+	using Helpers;
+	using Microsoft.AspNetCore.Mvc;
+	using Microsoft.EntityFrameworkCore;
 
-		public ProductsController(IRepository repository)
-        {
-			this.repository = repository;
+	public class ProductsController : Controller
+	{
+		private readonly IProductRepository productRepository;
+
+		private readonly IUserHelper userHelper;
+
+		public ProductsController(IProductRepository productRepository, IUserHelper userHelper)
+		{
+			this.productRepository = productRepository;
+			this.userHelper = userHelper;
 		}
 
-        // GET: Products
-        public IActionResult Index()
-        {
-            return View(this.repository.GetProducts());
-        }
+		// GET: Products
+		public IActionResult Index()
+		{
+			return View(this.productRepository.GetAll());
+		}
 
-        // GET: Products/Details/5
-        public IActionResult Details(int? id)
-        {
-            if (id == null)
-            {
-                return NotFound();
-            }
+		// GET: Products/Details/5
+		public async Task<IActionResult> Details(int? id)
+		{
+			if (id == null)
+			{
+				return NotFound();
+			}
 
-			var product = this.repository.GetProduct(id.Value);
-            if (product == null)
-            {
-                return NotFound();
-            }
+			var product = await this.productRepository.GetByIdAsync(id.Value);
+			if (product == null)
+			{
+				return NotFound();
+			}
 
-            return View(product);
-        }
+			return View(product);
+		}
 
-        // GET: Products/Create
-        public IActionResult Create()
-        {
-            return View();
-        }
+		// GET: Products/Create
+		public IActionResult Create()
+		{
+			return View();
+		}
 
-        // POST: Products/Create
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Product product)
-        {
-            if (ModelState.IsValid)
-            {
-               this.repository.AddProduct(product);
-				await this.repository.SaveAllAsync();
-                return RedirectToAction(nameof(Index));
-            }
-            return View(product);
-        }
+		// POST: Products/Create
+		[HttpPost]
+		[ValidateAntiForgeryToken]
+		public async Task<IActionResult> Create(Product product)
+		{
+			if (ModelState.IsValid)
+			{
+				// TODO: Pending to change to: this.User.Identity.Name
+				product.User = await this.userHelper.GetUserByEmailAsync("aaa@gmail.com");
+				await this.productRepository.CreateAsync(product);
+				return RedirectToAction(nameof(Index));
+			}
 
-        // GET: Products/Edit/5
-        public IActionResult Edit(int? id)
-        {
-            if (id == null)
-            {
-                return NotFound();
-            }
+			return View(product);
+		}
 
-			var product = this.repository.GetProduct(id.Value);
-			
-            if (product == null)
-            {
-                return NotFound();
-            }
-            return View(product);
-        }
+		// GET: Products/Edit/5
+		public async Task<IActionResult> Edit(int? id)
+		{
+			if (id == null)
+			{
+				return NotFound();
+			}
 
-        // POST: Products/Edit/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(Product product)
-        {
-           
-            if (ModelState.IsValid)
-            {
-                try
-                {
-                    this.repository.UpdateProduct(product);
-                    await this.repository.SaveAllAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!this.repository.ProductExists(product.Id))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-                return RedirectToAction(nameof(Index));
-            }
-            return View(product);
-        }
+			var product = await this.productRepository.GetByIdAsync(id.Value);
+			if (product == null)
+			{
+				return NotFound();
+			}
 
-        // GET: Products/Delete/5
-        public IActionResult Delete(int? id)
-        {
-            if (id == null)
-            {
-                return NotFound();
-            }
+			return View(product);
+		}
 
-			var product = this.repository.GetProduct(id.Value);
-            if (product == null)
-            {
-                return NotFound();
-            }
+		// POST: Products/Edit/5
+		[HttpPost]
+		[ValidateAntiForgeryToken]
+		public async Task<IActionResult> Edit(Product product)
+		{
+			if (ModelState.IsValid)
+			{
+				try
+				{
+					// TODO: Pending to change to: this.User.Identity.Name
+					product.User = await this.userHelper.GetUserByEmailAsync("aaa@gmail.com");
+					await this.productRepository.UpdateAsync(product);
+				}
+				catch (DbUpdateConcurrencyException)
+				{
+					if (!await this.productRepository.ExistAsync(product.Id))
+					{
+						return NotFound();
+					}
+					else
+					{
+						throw;
+					}
+				}
+				return RedirectToAction(nameof(Index));
+			}
 
-            return View(product);
-        }
+			return View(product);
+		}
 
-        // POST: Products/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            var product = this.repository.GetProduct(id);
-			this.repository.RemoveProduct(product);
-			await this.repository.SaveAllAsync();
+		// GET: Products/Delete/5
+		public async Task<IActionResult> Delete(int? id)
+		{
+			if (id == null)
+			{
+				return NotFound();
+			}
 
-            return RedirectToAction(nameof(Index));
-        }
+			var product = await this.productRepository.GetByIdAsync(id.Value);
+			if (product == null)
+			{
+				return NotFound();
+			}
 
-    }
+			return View(product);
+		}
+
+		// POST: Products/Delete/5
+		[HttpPost, ActionName("Delete")]
+		[ValidateAntiForgeryToken]
+		public async Task<IActionResult> DeleteConfirmed(int id)
+		{
+			var product = await this.productRepository.GetByIdAsync(id);
+			await this.productRepository.DeleteAsync(product);
+			return RedirectToAction(nameof(Index));
+		}
+	}
+
 }
