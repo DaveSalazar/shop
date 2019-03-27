@@ -2,12 +2,16 @@
 
 namespace Shop.Web.Controllers
 {
+	using System;
+	using System.IO;
+	using System.Linq;
 	using System.Threading.Tasks;
 	using Data;
 	using Data.Entities;
 	using Helpers;
 	using Microsoft.AspNetCore.Mvc;
 	using Microsoft.EntityFrameworkCore;
+	using Shop.Web.Models;
 
 	public class ProductsController : Controller
 	{
@@ -24,7 +28,7 @@ namespace Shop.Web.Controllers
 		// GET: Products
 		public IActionResult Index()
 		{
-			return View(this.productRepository.GetAll());
+			return View(this.productRepository.GetAll().OrderBy(p => p.Name));
 		}
 
 		// GET: Products/Details/5
@@ -53,17 +57,54 @@ namespace Shop.Web.Controllers
 		// POST: Products/Create
 		[HttpPost]
 		[ValidateAntiForgeryToken]
-		public async Task<IActionResult> Create(Product product)
+		public async Task<IActionResult> Create(ProductViewModel view)
 		{
 			if (ModelState.IsValid)
 			{
+				var path = string.Empty;
+
+				if (view.ImageFile != null && view.ImageFile.Length > 0)
+				{
+					var guid = Guid.NewGuid().ToString();
+					var file = $"{guid}.jpg";
+					path = Path.Combine(
+						Directory.GetCurrentDirectory(), 
+						"wwwroot\\images\\Products", 
+						file);
+
+					using (var stream = new FileStream(path, FileMode.Create))
+					{
+						await view.ImageFile.CopyToAsync(stream);
+					}
+
+					path = $"~/images/Products/{file}";
+				}
+
+				var product = this.ToProduct(view, path);
+
 				// TODO: Pending to change to: this.User.Identity.Name
 				product.User = await this.userHelper.GetUserByEmailAsync("aaa@gmail.com");
 				await this.productRepository.CreateAsync(product);
 				return RedirectToAction(nameof(Index));
 			}
 
-			return View(product);
+			return View(view);
+		}
+
+		private Product ToProduct(ProductViewModel view, string path)
+		{
+			return new Product
+			{
+				Id = view.Id,
+				ImageUrl = path,
+				IsAvailabe = view.IsAvailabe,
+				LastPurchase = view.LastPurchase,
+				LastSale = view.LastSale,
+				Name = view.Name,
+				Price = view.Price,
+				Stock = view.Stock,
+				User = view.User
+			};
 		}
 
 		// GET: Products/Edit/5
@@ -79,26 +120,45 @@ namespace Shop.Web.Controllers
 			{
 				return NotFound();
 			}
+			var view = this.ToProductViewModel(product);
 
-			return View(product);
+			return View(view);
 		}
 
 		// POST: Products/Edit/5
 		[HttpPost]
 		[ValidateAntiForgeryToken]
-		public async Task<IActionResult> Edit(Product product)
+		public async Task<IActionResult> Edit(ProductViewModel view)
 		{
 			if (ModelState.IsValid)
 			{
 				try
 				{
+
+					var path = view.ImageUrl;
+
+					if (view.ImageFile != null && view.ImageFile.Length > 0)
+					{
+						path = Path.Combine(
+							Directory.GetCurrentDirectory(),
+							"wwwroot\\images\\Products",
+							view.ImageFile.FileName);
+
+						using (var stream = new FileStream(path, FileMode.Create))
+						{
+							await view.ImageFile.CopyToAsync(stream);
+						}
+
+						path = $"~/images/Products/{view.ImageFile.FileName}";
+					}
+					var product = this.ToProduct(view, path);
 					// TODO: Pending to change to: this.User.Identity.Name
 					product.User = await this.userHelper.GetUserByEmailAsync("aaa@gmail.com");
 					await this.productRepository.UpdateAsync(product);
 				}
 				catch (DbUpdateConcurrencyException)
 				{
-					if (!await this.productRepository.ExistAsync(product.Id))
+					if (!await this.productRepository.ExistAsync(view.Id))
 					{
 						return NotFound();
 					}
@@ -109,8 +169,25 @@ namespace Shop.Web.Controllers
 				}
 				return RedirectToAction(nameof(Index));
 			}
+			//var view = this.ToProductViewModel(product);
 
-			return View(product);
+			return View(view);
+		}
+
+		private ProductViewModel ToProductViewModel(Product product)
+		{
+			return new ProductViewModel
+			{
+				Id = product.Id,
+				ImageUrl = product.ImageUrl,
+				IsAvailabe = product.IsAvailabe,
+				LastPurchase = product.LastPurchase,
+				LastSale = product.LastSale,
+				Name = product.Name,
+				Price = product.Price,
+				Stock = product.Stock,
+				User = product.User
+			};
 		}
 
 		// GET: Products/Delete/5
