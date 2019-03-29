@@ -10,6 +10,12 @@ namespace Shop.Web.Controllers
 {
 	public class HomeController : Controller
 	{
+		[Route("error/404")]
+		public IActionResult Error404()
+		{
+			return View();
+		}
+
 		public IActionResult Index()
 		{
 			return View();
